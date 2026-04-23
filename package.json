@@ -1,0 +1,32 @@
+{
+  "name": "stackdiff",
+  "version": "0.1.0",
+  "description": "CLI tool to visualize and compare environment variable differences across deployment stages",
+  "main": "dist/index.js",
+  "bin": {
+    "stackdiff": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "jest",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.8",
+    "@types/node": "^20.9.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.2.2"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/*.test.ts"]
+  }
+}
