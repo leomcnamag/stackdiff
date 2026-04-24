@@ -1,52 +1,49 @@
-export type EnvMap = Record<string, string>;
+export type EntryStatus = 'added' | 'removed' | 'changed' | 'unchanged';
+
+export interface DiffEntry {
+  key: string;
+  status: EntryStatus;
+  baseValue?: string;
+  targetValue?: string;
+}
 
 export interface DiffResult {
-  key: string;
-  status: 'added' | 'removed' | 'changed';
-  valueA: string | undefined;
-  valueB: string | undefined;
+  stage: string;
+  entries: DiffEntry[];
 }
 
-export interface StageDiff {
-  stageA: string;
-  stageB: string;
-  diffs: DiffResult[];
-}
+export type EnvMap = Record<string, string>;
 
-export function diffEnvMaps(mapA: EnvMap, mapB: EnvMap): DiffResult[] {
-  const results: DiffResult[] = [];
-  const allKeys = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
+export function diffEnvMaps(base: EnvMap, target: EnvMap): DiffEntry[] {
+  const keys = new Set([...Object.keys(base), ...Object.keys(target)]);
+  const entries: DiffEntry[] = [];
 
-  for (const key of Array.from(allKeys).sort()) {
-    const valA = mapA[key];
-    const valB = mapB[key];
+  for (const key of keys) {
+    const inBase = key in base;
+    const inTarget = key in target;
 
-    if (valA === undefined && valB !== undefined) {
-      results.push({ key, status: 'added', valueA: undefined, valueB: valB });
-    } else if (valA !== undefined && valB === undefined) {
-      results.push({ key, status: 'removed', valueA: valA, valueB: undefined });
-    } else if (valA !== valB) {
-      results.push({ key, status: 'changed', valueA: valA, valueB: valB });
+    if (inBase && inTarget) {
+      if (base[key] !== target[key]) {
+        entries.push({ key, status: 'changed', baseValue: base[key], targetValue: target[key] });
+      } else {
+        entries.push({ key, status: 'unchanged', baseValue: base[key], targetValue: target[key] });
+      }
+    } else if (inBase) {
+      entries.push({ key, status: 'removed', baseValue: base[key] });
+    } else {
+      entries.push({ key, status: 'added', targetValue: target[key] });
     }
   }
 
-  return results;
+  return entries.sort((a, b) => a.key.localeCompare(b.key));
 }
 
 export function diffStages(
-  stages: Record<string, EnvMap>,
-  stageA: string,
-  stageB: string
-): StageDiff {
-  const mapA = stages[stageA];
-  const mapB = stages[stageB];
-
-  if (!mapA) throw new Error(`Stage not found: ${stageA}`);
-  if (!mapB) throw new Error(`Stage not found: ${stageB}`);
-
-  return {
-    stageA,
-    stageB,
-    diffs: diffEnvMaps(mapA, mapB),
-  };
+  base: EnvMap,
+  stages: Record<string, EnvMap>
+): DiffResult[] {
+  return Object.entries(stages).map(([stage, target]) => ({
+    stage,
+    entries: diffEnvMaps(base, target),
+  }));
 }
