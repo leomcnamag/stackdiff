@@ -1,69 +1,52 @@
-import { EnvMap, ParseResult } from "./parser";
+export type EnvMap = Record<string, string>;
 
-export type ChangeKind = "added" | "removed" | "changed" | "unchanged";
-
-export interface VarDiff {
+export interface DiffResult {
   key: string;
-  kind: ChangeKind;
-  baseValue?: string;
-  targetValue?: string;
+  status: 'added' | 'removed' | 'changed';
+  valueA: string | undefined;
+  valueB: string | undefined;
 }
 
 export interface StageDiff {
-  base: string;
-  target: string;
-  diffs: VarDiff[];
+  stageA: string;
+  stageB: string;
+  diffs: DiffResult[];
 }
 
-/**
- * Computes the diff between two EnvMaps.
- */
-export function diffEnvMaps(base: EnvMap, target: EnvMap): VarDiff[] {
-  const allKeys = new Set([...Object.keys(base), ...Object.keys(target)]);
-  const result: VarDiff[] = [];
+export function diffEnvMaps(mapA: EnvMap, mapB: EnvMap): DiffResult[] {
+  const results: DiffResult[] = [];
+  const allKeys = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
 
   for (const key of Array.from(allKeys).sort()) {
-    const inBase = key in base;
-    const inTarget = key in target;
+    const valA = mapA[key];
+    const valB = mapB[key];
 
-    if (inBase && !inTarget) {
-      result.push({ key, kind: "removed", baseValue: base[key] });
-    } else if (!inBase && inTarget) {
-      result.push({ key, kind: "added", targetValue: target[key] });
-    } else if (base[key] !== target[key]) {
-      result.push({
-        key,
-        kind: "changed",
-        baseValue: base[key],
-        targetValue: target[key],
-      });
-    } else {
-      result.push({
-        key,
-        kind: "unchanged",
-        baseValue: base[key],
-        targetValue: target[key],
-      });
+    if (valA === undefined && valB !== undefined) {
+      results.push({ key, status: 'added', valueA: undefined, valueB: valB });
+    } else if (valA !== undefined && valB === undefined) {
+      results.push({ key, status: 'removed', valueA: valA, valueB: undefined });
+    } else if (valA !== valB) {
+      results.push({ key, status: 'changed', valueA: valA, valueB: valB });
     }
   }
 
-  return result;
+  return results;
 }
 
-/**
- * Computes diffs for a list of ParseResults in sequential order.
- * base -> stage[0], stage[0] -> stage[1], etc.
- */
-export function diffStages(stages: ParseResult[]): StageDiff[] {
-  if (stages.length < 2) return [];
+export function diffStages(
+  stages: Record<string, EnvMap>,
+  stageA: string,
+  stageB: string
+): StageDiff {
+  const mapA = stages[stageA];
+  const mapB = stages[stageB];
 
-  const result: StageDiff[] = [];
-  for (let i = 0; i < stages.length - 1; i++) {
-    result.push({
-      base: stages[i].stage,
-      target: stages[i + 1].stage,
-      diffs: diffEnvMaps(stages[i].vars, stages[i + 1].vars),
-    });
-  }
-  return result;
+  if (!mapA) throw new Error(`Stage not found: ${stageA}`);
+  if (!mapB) throw new Error(`Stage not found: ${stageB}`);
+
+  return {
+    stageA,
+    stageB,
+    diffs: diffEnvMaps(mapA, mapB),
+  };
 }
