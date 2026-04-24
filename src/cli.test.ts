@@ -14,6 +14,13 @@ function writeTempEnv(content: string): string {
   return file;
 }
 
+/**
+ * Removes the temporary directory that contains the given file.
+ */
+function cleanupTempEnv(file: string): void {
+  fs.rmSync(path.dirname(file), { recursive: true });
+}
+
 describe('cli compare', () => {
   let fileA: string;
   let fileB: string;
@@ -24,8 +31,8 @@ describe('cli compare', () => {
   });
 
   afterAll(() => {
-    fs.rmSync(path.dirname(fileA), { recursive: true });
-    fs.rmSync(path.dirname(fileB), { recursive: true });
+    cleanupTempEnv(fileA);
+    cleanupTempEnv(fileB);
   });
 
   it('outputs table format by default', () => {
