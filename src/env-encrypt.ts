@@ -4,13 +4,14 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 const KEY_LENGTH = 32;
+const SALT_LENGTH = 16;
 
 export function deriveKey(passphrase: string, salt: Buffer): Buffer {
   return crypto.scryptSync(passphrase, salt, KEY_LENGTH);
 }
 
 export function encryptValue(value: string, passphrase: string): string {
-  const salt = crypto.randomBytes(16);
+  const salt = crypto.randomBytes(SALT_LENGTH);
   const iv = crypto.randomBytes(IV_LENGTH);
   const key = deriveKey(passphrase, salt);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -21,14 +22,21 @@ export function encryptValue(value: string, passphrase: string): string {
 
 export function decryptValue(encoded: string, passphrase: string): string {
   const buf = Buffer.from(encoded, 'base64');
-  const salt = buf.subarray(0, 16);
-  const iv = buf.subarray(16, 16 + IV_LENGTH);
-  const tag = buf.subarray(16 + IV_LENGTH, 16 + IV_LENGTH + TAG_LENGTH);
-  const encrypted = buf.subarray(16 + IV_LENGTH + TAG_LENGTH);
+  if (buf.length < SALT_LENGTH + IV_LENGTH + TAG_LENGTH) {
+    throw new Error('Encrypted value is too short or corrupted');
+  }
+  const salt = buf.subarray(0, SALT_LENGTH);
+  const iv = buf.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+  const tag = buf.subarray(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+  const encrypted = buf.subarray(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
   const key = deriveKey(passphrase, salt);
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(tag);
-  return decipher.update(encrypted) + decipher.final('utf8');
+  try {
+    return decipher.update(encrypted) + decipher.final('utf8');
+  } catch {
+    throw new Error('Decryption failed: invalid passphrase or corrupted data');
+  }
 }
 
 export function encryptEnvMap(
